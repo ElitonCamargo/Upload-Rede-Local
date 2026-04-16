@@ -1,0 +1,275 @@
+/* ============================================================
+   Reset e base
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+/* ============================================================
+   Layout principal
+   ============================================================ */
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.card h1 {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.card h2 {
+  font-size: 1.25rem;
+  margin-bottom: 4px;
+}
+
+.subtitulo {
+  color: #777;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+/* ============================================================
+   Formulário
+   ============================================================ */
+
+fieldset {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+legend {
+  font-weight: 600;
+  padding: 0 6px;
+  color: #555;
+}
+
+/* --- Campos de nome --- */
+
+.campo-nome {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.campo-nome input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.campo-nome input:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.campo-nome .btn-remover {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  width: 36px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.2s;
+}
+
+.campo-nome .btn-remover:hover {
+  background: #c0392b;
+}
+
+#btnAdicionarNome {
+  background: none;
+  border: 2px dashed #4a90d9;
+  color: #4a90d9;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  width: 100%;
+  transition: background 0.2s, color 0.2s;
+}
+
+#btnAdicionarNome:hover {
+  background: #4a90d9;
+  color: #fff;
+}
+
+/* --- Dropzone de arquivos --- */
+
+#dropzone {
+  border: 2px dashed #bbb;
+  border-radius: 8px;
+  padding: 32px 16px;
+  text-align: center;
+  color: #888;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+#dropzone.drag-over {
+  border-color: #4a90d9;
+  background: #eaf2fc;
+}
+
+#dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#listaArquivos {
+  list-style: none;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+#listaArquivos li {
+  padding: 6px 10px;
+  background: #f7f7f7;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#listaArquivos li button {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 4px;
+}
+
+/* --- Botão de envio --- */
+
+#btnEnviar {
+  width: 100%;
+  padding: 12px;
+  background: #4a90d9;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#btnEnviar:hover {
+  background: #3a7bc8;
+}
+
+#btnEnviar:disabled {
+  background: #a0c4e8;
+  cursor: not-allowed;
+}
+
+/* --- Mensagem de feedback --- */
+
+.mensagem {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.mensagem.sucesso {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.mensagem.erro {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* ============================================================
+   Lista de envios
+   ============================================================ */
+
+.lista-envios {
+  list-style: none;
+}
+
+.lista-envios li {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.lista-envios li:last-child {
+  border-bottom: none;
+}
+
+.lista-envios .nome-envio {
+  font-weight: 600;
+}
+
+.lista-envios .data-envio {
+  color: #999;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.lista-envios .arquivos-envio {
+  color: #666;
+  font-size: 0.82rem;
+}
+
+.lista-envios .vazio {
+  color: #aaa;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ============================================================
+   Responsivo
+   ============================================================ */
+
+@media (max-width: 480px) {
+  .card {
+    padding: 20px 16px;
+  }
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envio de Atividades</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <!-- ===================== FORMULÁRIO ===================== -->
+    <section class="card">
+      <h1>📄 Envio de Atividade</h1>
+      <p class="subtitulo">Preencha os campos abaixo e envie seus arquivos.</p>
+
+      <form id="formEnvio">
+        <!-- Nomes dos alunos -->
+        <fieldset>
+          <legend>Aluno(s)</legend>
+          <div id="camposNomes">
+            <div class="campo-nome">
+              <input type="text" name="nome" placeholder="Nome completo do aluno" required />
+            </div>
+          </div>
+          <button type="button" id="btnAdicionarNome" title="Adicionar membro do grupo">
+            + Adicionar aluno ao grupo
+          </button>
+        </fieldset>
+
+        <!-- Upload de arquivos -->
+        <fieldset>
+          <legend>Arquivos</legend>
+          <div id="dropzone">
+            <p>Arraste os arquivos aqui<br/>ou <strong>clique para selecionar</strong></p>
+            <input type="file" id="inputArquivos" multiple />
+          </div>
+          <ul id="listaArquivos"></ul>
+        </fieldset>
+
+        <button type="submit" id="btnEnviar">Enviar Atividade</button>
+      </form>
+
+      <!-- Feedback de envio -->
+      <div id="mensagem" class="mensagem" hidden></div>
+    </section>
+
+    <!-- =================== LISTAGEM ======================== -->
+    <section class="card">
+      <h2>✅ Atividades Enviadas</h2>
+      <p class="subtitulo">Lista atualizada automaticamente após cada envio.</p>
+      <ul id="listaEnvios" class="lista-envios">
+        <li class="vazio">Nenhuma atividade enviada ainda.</li>
+      </ul>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
