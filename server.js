@@ -8,7 +8,7 @@ const os = require('os');
 require('dotenv').config();
 
 const app = express();
-const PORT = 8080;
+const PORT = parseInt(process.env.port || process.env.PORT || '3000', 10);
 
 // Caminhos principais
 const UPLOAD_DIR = path.join(__dirname, 'upload');
