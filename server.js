@@ -1,8 +1,11 @@
 const express = require('express');
 const multer = require('multer');
+const { ZipArchive } = require('archiver');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+
+require('dotenv').config();
 
 const app = express();
 const PORT = 8080;
@@ -10,6 +13,10 @@ const PORT = 8080;
 // Caminhos principais
 const UPLOAD_DIR = path.join(__dirname, 'upload');
 const DB_FILE = path.join(__dirname, 'db.json');
+const ADMIN_VIEW_FILE = path.join(__dirname, 'views', 'admin.html');
+
+const ADMIN_USER = process.env.user || process.env.USER || '';
+const ADMIN_PASS = process.env.pass || process.env.PASS || '';
 
 // Garante que a pasta de upload existe
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -32,6 +39,47 @@ function lerBanco() {
 
 function salvarBanco(dados) {
   fs.writeFileSync(DB_FILE, JSON.stringify(dados, null, 2));
+}
+
+function limparBanco() {
+  salvarBanco({ envios: [] });
+}
+
+function limparDiretorioUpload() {
+  const itens = fs.readdirSync(UPLOAD_DIR, { withFileTypes: true });
+
+  for (const item of itens) {
+    const caminhoItem = path.join(UPLOAD_DIR, item.name);
+    fs.rmSync(caminhoItem, { recursive: true, force: true });
+  }
+}
+
+function autenticacaoAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
+    return res.status(401).send('Autenticacao obrigatoria.');
+  }
+
+  const base64Credenciais = authHeader.split(' ')[1];
+  const credenciais = Buffer.from(base64Credenciais, 'base64').toString('utf8');
+  const separadorIndex = credenciais.indexOf(':');
+
+  if (separadorIndex === -1) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
+    return res.status(401).send('Credenciais invalidas.');
+  }
+
+  const usuario = credenciais.slice(0, separadorIndex);
+  const senha = credenciais.slice(separadorIndex + 1);
+
+  if (usuario !== ADMIN_USER || senha !== ADMIN_PASS) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
+    return res.status(401).send('Usuario ou senha incorretos.');
+  }
+
+  next();
 }
 
 // ============================================================
@@ -121,6 +169,57 @@ app.get('/api/envios', (_req, res) => {
   } catch (err) {
     console.error('Erro ao ler envios:', err);
     res.status(500).json({ erro: 'Erro ao buscar os envios.' });
+  }
+});
+
+app.get('/admin', autenticacaoAdmin, (_req, res) => {
+  res.sendFile(ADMIN_VIEW_FILE);
+});
+
+app.get('/api/admin/backup', autenticacaoAdmin, (req, res) => {
+  try {
+    const nomeArquivo = `backup-upload-${Date.now()}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+
+    archive.on('error', (err) => {
+      console.error('Erro ao gerar backup zip:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ erro: 'Erro ao gerar arquivo de backup.' });
+      } else {
+        res.end();
+      }
+    });
+
+    // Limpa banco e uploads apenas apos o envio completo do arquivo ZIP.
+    res.on('finish', () => {
+      if (res.statusCode === 200) {
+        try {
+          limparBanco();
+          limparDiretorioUpload();
+        } catch (err) {
+          console.error('Erro ao limpar dados apos backup:', err);
+        }
+      }
+    });
+
+    archive.pipe(res);
+
+    const itens = fs.readdirSync(UPLOAD_DIR, { withFileTypes: true });
+    const diretorios = itens.filter((item) => item.isDirectory());
+
+    for (const dir of diretorios) {
+      const diretorioCompleto = path.join(UPLOAD_DIR, dir.name);
+      archive.directory(diretorioCompleto, dir.name);
+    }
+
+    archive.finalize();
+  } catch (err) {
+    console.error('Erro no endpoint de backup:', err);
+    res.status(500).json({ erro: 'Erro interno ao processar backup.' });
   }
 });
 
