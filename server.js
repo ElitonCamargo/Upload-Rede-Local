@@ -145,6 +145,7 @@ app.post('/api/enviar', upload.array('arquivos'), (req, res) => {
     db.envios.push({
       id: Date.now(),
       nomes,
+      ip: req.socket.remoteAddress || req.connection.remoteAddress || 'Desconecido',
       pasta: nomePasta,
       arquivos: req.files.map(f => {
         const nomeOriginal = Buffer.from(f.originalname, 'latin1').toString('utf8');
