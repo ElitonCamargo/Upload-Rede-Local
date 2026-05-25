@@ -1,9 +1,10 @@
-const express = require('express');
+﻿const express = require('express');
 const multer = require('multer');
 const { ZipArchive } = require('archiver');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 
 require('dotenv').config();
 
@@ -12,91 +13,71 @@ const PORT = parseInt(process.env.port || process.env.PORT || '3000', 10);
 
 // Caminhos principais
 const UPLOAD_DIR = path.join(__dirname, 'upload');
-const DB_FILE = path.join(__dirname, 'db.json');
-const ADMIN_VIEW_FILE = path.join(__dirname, 'views', 'admin.html');
-
-const ADMIN_USER = process.env.user || process.env.USER || '';
-const ADMIN_PASS = process.env.pass || process.env.PASS || '';
+const DB_FILE    = path.join(__dirname, 'db.json');
+const VIEWS_DIR  = path.join(__dirname, 'views');
 
 // Garante que a pasta de upload existe
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR);
 }
 
-// Garante que o arquivo db.json existe
+// Garante que o arquivo db.json existe com estrutura completa
 if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, JSON.stringify({ envios: [] }, null, 2));
+  fs.writeFileSync(DB_FILE, JSON.stringify({ professores: [], envios: [] }, null, 2));
 }
 
 // ============================================================
-// Helpers para leitura/escrita do banco de dados JSON
+// Helpers
 // ============================================================
 
 function lerBanco() {
-  const dados = fs.readFileSync(DB_FILE, 'utf-8');
-  return JSON.parse(dados);
+  try {
+    const dados = fs.readFileSync(DB_FILE, 'utf8').replace(/^\uFEFF/, '').trim();
+    if (!dados) return { professores: [], envios: [] };
+    const db = JSON.parse(dados);
+    if (!db || !Array.isArray(db.envios)) db.envios = [];
+    if (!Array.isArray(db.professores)) db.professores = [];
+    return db;
+  } catch (err) {
+    console.error('db.json invalido, resetando banco:', err.message);
+    const banco = { professores: [], envios: [] };
+    salvarBanco(banco);
+    return banco;
+  }
 }
 
 function salvarBanco(dados) {
   fs.writeFileSync(DB_FILE, JSON.stringify(dados, null, 2));
 }
 
-function limparBanco() {
-  salvarBanco({ envios: [] });
+function hashSenha(senha) {
+  return crypto.createHash('sha256').update(senha).digest('hex');
 }
 
-function limparDiretorioUpload() {
-  const itens = fs.readdirSync(UPLOAD_DIR, { withFileTypes: true });
-
-  for (const item of itens) {
-    const caminhoItem = path.join(UPLOAD_DIR, item.name);
-    fs.rmSync(caminhoItem, { recursive: true, force: true });
-  }
-}
-
-function autenticacaoAdmin(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
-    return res.status(401).send('Autenticacao obrigatoria.');
-  }
-
-  const base64Credenciais = authHeader.split(' ')[1];
-  const credenciais = Buffer.from(base64Credenciais, 'base64').toString('utf8');
-  const separadorIndex = credenciais.indexOf(':');
-
-  if (separadorIndex === -1) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
-    return res.status(401).send('Credenciais invalidas.');
-  }
-
-  const usuario = credenciais.slice(0, separadorIndex);
-  const senha = credenciais.slice(separadorIndex + 1);
-
-  if (usuario !== ADMIN_USER || senha !== ADMIN_PASS) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Area Administrativa"');
-    return res.status(401).send('Usuario ou senha incorretos.');
-  }
-
-  next();
-}
-
-// ============================================================
-// Configuração do Multer (upload de arquivos)
-// ============================================================
-
-// Sanitiza o nome da pasta removendo caracteres inválidos para o SO
 function sanitizarNomePasta(nome) {
   return nome.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim();
 }
 
+const PATHS_RESERVADOS = new Set([
+  'admin', 'prof', 'api', 'public', 'upload', 'views',
+  'node_modules', 'favicon.ico', 'style.css', 'script.js'
+]);
+
+function validarPath(p) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9-]{0,48}$/.test(p) &&
+         !PATHS_RESERVADOS.has(p.toLowerCase());
+}
+
+// ============================================================
+// Multer - destino: upload/<profPath>/<aluno>/
+// ============================================================
+
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    // Monta o nome da pasta a partir dos nomes dos alunos
-    const nomes = JSON.parse(req.body.nomes || '[]');
+    const profPath  = sanitizarNomePasta(req.params.profPath || '');
+    const nomes     = JSON.parse(req.body.nomes || '[]');
     const nomePasta = sanitizarNomePasta(nomes.join(' - '));
-    const destino = path.join(UPLOAD_DIR, nomePasta);
+    const destino   = path.join(UPLOAD_DIR, profPath, nomePasta);
 
     if (!fs.existsSync(destino)) {
       fs.mkdirSync(destino, { recursive: true });
@@ -105,7 +86,6 @@ const storage = multer.diskStorage({
     cb(null, destino);
   },
   filename: (_req, file, cb) => {
-    // Decodifica o nome original para preservar acentos
     const nomeOriginal = Buffer.from(file.originalname, 'latin1').toString('utf8');
     cb(null, nomeOriginal);
   }
@@ -114,20 +94,81 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // ============================================================
-// Middlewares
+// Middlewares globais
 // ============================================================
 
 app.use(express.json());
-// Serve os arquivos estáticos do frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================
-// Rotas da API
+// Rotas estaticas (ANTES do catch-all /:profPath)
 // ============================================================
 
-// POST /api/enviar  –  Recebe os arquivos e registra o envio
-app.post('/api/enviar', upload.array('arquivos'), (req, res) => {
+// Raiz redireciona para /prof
+app.get('/', (_req, res) => {
+  res.redirect('/prof');
+});
+
+// Pagina de criacao de sala do professor
+app.get('/prof', (_req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'prof.html'));
+});
+
+// Pagina de administracao
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'admin.html'));
+});
+
+// ============================================================
+// API - Professores
+// ============================================================
+
+// POST /api/prof/criar  -  Cria uma nova sala
+app.post('/api/prof/criar', (req, res) => {
+  const { usuario, senha, path: profPath } = req.body;
+
+  if (!usuario?.trim() || !senha?.trim() || !profPath?.trim()) {
+    return res.status(400).json({ erro: 'Informe usuario, senha e path.' });
+  }
+
+  if (!validarPath(profPath.trim())) {
+    return res.status(400).json({
+      erro: 'Path invalido. Use apenas letras, numeros e hifens (max 49 caracteres). Nomes reservados nao sao permitidos.'
+    });
+  }
+
+  const db = lerBanco();
+  if (db.professores.some(p => p.path === profPath.trim().toLowerCase())) {
+    return res.status(409).json({ erro: 'Este path ja esta em uso por outro professor.' });
+  }
+
+  const novoProfessor = {
+    id:        Date.now(),
+    usuario:   usuario.trim(),
+    senhaHash: hashSenha(senha),
+    path:      profPath.trim().toLowerCase(),
+    criadoEm: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  };
+
+  db.professores.push(novoProfessor);
+  salvarBanco(db);
+
+  const dirProf = path.join(UPLOAD_DIR, sanitizarNomePasta(novoProfessor.path));
+  if (!fs.existsSync(dirProf)) {
+    fs.mkdirSync(dirProf, { recursive: true });
+  }
+
+  res.json({ sucesso: true, path: novoProfessor.path, mensagem: `Sala criada! Compartilhe o endereco /${novoProfessor.path} com seus alunos.` });
+});
+
+// ============================================================
+// API - Alunos
+// ============================================================
+
+// POST /api/enviar/:profPath  -  Recebe arquivos dos alunos
+app.post('/api/enviar/:profPath', upload.array('arquivos'), (req, res) => {
   try {
+    const { profPath } = req.params;
     const nomes = JSON.parse(req.body.nomes || '[]');
 
     if (!nomes.length || nomes.some(n => !n.trim())) {
@@ -138,19 +179,22 @@ app.post('/api/enviar', upload.array('arquivos'), (req, res) => {
       return res.status(400).json({ erro: 'Envie pelo menos um arquivo.' });
     }
 
-    const nomePasta = sanitizarNomePasta(nomes.join(' - '));
-
-    // Registra o envio no banco
     const db = lerBanco();
+    const professor = db.professores.find(p => p.path === profPath.toLowerCase());
+    if (!professor) {
+      return res.status(404).json({ erro: 'Sala nao encontrada.' });
+    }
+
+    const nomePasta = sanitizarNomePasta(nomes.join(' - '));
+    const ip = req.socket.remoteAddress || req.ip || 'desconhecido';
+
     db.envios.push({
-      id: Date.now(),
+      id:            Date.now(),
+      professorPath: professor.path,
       nomes,
-      ip: req.socket.remoteAddress || req.connection.remoteAddress || 'Desconecido',
-      pasta: nomePasta,
-      arquivos: req.files.map(f => {
-        const nomeOriginal = Buffer.from(f.originalname, 'latin1').toString('utf8');
-        return nomeOriginal;
-      }),
+      ip,
+      pasta:    nomePasta,
+      arquivos: req.files.map(f => Buffer.from(f.originalname, 'latin1').toString('utf8')),
       dataEnvio: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     });
     salvarBanco(db);
@@ -162,24 +206,46 @@ app.post('/api/enviar', upload.array('arquivos'), (req, res) => {
   }
 });
 
-// GET /api/envios  –  Retorna a lista de envios realizados
-app.get('/api/envios', (_req, res) => {
+// GET /api/envios/:profPath  -  Lista envios de uma sala
+app.get('/api/envios/:profPath', (req, res) => {
   try {
+    const { profPath } = req.params;
     const db = lerBanco();
-    res.json(db.envios);
+    const envios = db.envios.filter(e => e.professorPath === profPath.toLowerCase());
+    res.json(envios);
   } catch (err) {
     console.error('Erro ao ler envios:', err);
     res.status(500).json({ erro: 'Erro ao buscar os envios.' });
   }
 });
 
-app.get('/admin', autenticacaoAdmin, (_req, res) => {
-  res.sendFile(ADMIN_VIEW_FILE);
-});
+// ============================================================
+// API - Admin
+// ============================================================
 
-app.get('/api/admin/backup', autenticacaoAdmin, (req, res) => {
+// POST /api/admin/backup  -  Autentica professor, gera ZIP e limpa sala
+app.post('/api/admin/backup', (req, res) => {
   try {
-    const nomeArquivo = `backup-upload-${Date.now()}.zip`;
+    const { usuario, senha, path: profPath } = req.body;
+
+    if (!usuario?.trim() || !senha?.trim() || !profPath?.trim()) {
+      return res.status(400).json({ erro: 'Informe usuario, senha e path.' });
+    }
+
+    const db = lerBanco();
+    const profIndex = db.professores.findIndex(p =>
+      p.path    === profPath.trim().toLowerCase() &&
+      p.usuario === usuario.trim() &&
+      p.senhaHash === hashSenha(senha)
+    );
+
+    if (profIndex === -1) {
+      return res.status(401).json({ erro: 'Usuario, senha ou path incorretos.' });
+    }
+
+    const professor  = db.professores[profIndex];
+    const dirProf    = path.join(UPLOAD_DIR, sanitizarNomePasta(professor.path));
+    const nomeArquivo = `backup-${professor.path}-${Date.now()}.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
@@ -195,12 +261,17 @@ app.get('/api/admin/backup', autenticacaoAdmin, (req, res) => {
       }
     });
 
-    // Limpa banco e uploads apenas apos o envio completo do arquivo ZIP.
+    // Limpa dados apenas apos envio completo do ZIP
     res.on('finish', () => {
       if (res.statusCode === 200) {
         try {
-          limparBanco();
-          limparDiretorioUpload();
+          if (fs.existsSync(dirProf)) {
+            fs.rmSync(dirProf, { recursive: true, force: true });
+          }
+          const dbAtualizado = lerBanco();
+          dbAtualizado.envios      = dbAtualizado.envios.filter(e => e.professorPath !== professor.path);
+          dbAtualizado.professores = dbAtualizado.professores.filter(p => p.path !== professor.path);
+          salvarBanco(dbAtualizado);
         } catch (err) {
           console.error('Erro ao limpar dados apos backup:', err);
         }
@@ -209,12 +280,11 @@ app.get('/api/admin/backup', autenticacaoAdmin, (req, res) => {
 
     archive.pipe(res);
 
-    const itens = fs.readdirSync(UPLOAD_DIR, { withFileTypes: true });
-    const diretorios = itens.filter((item) => item.isDirectory());
-
-    for (const dir of diretorios) {
-      const diretorioCompleto = path.join(UPLOAD_DIR, dir.name);
-      archive.directory(diretorioCompleto, dir.name);
+    if (fs.existsSync(dirProf)) {
+      const itens = fs.readdirSync(dirProf, { withFileTypes: true });
+      for (const item of itens.filter(i => i.isDirectory())) {
+        archive.directory(path.join(dirProf, item.name), item.name);
+      }
     }
 
     archive.finalize();
@@ -225,11 +295,31 @@ app.get('/api/admin/backup', autenticacaoAdmin, (req, res) => {
 });
 
 // ============================================================
+// Catch-all: pagina de upload dos alunos (DEVE ser a ultima GET)
+// ============================================================
+
+app.get('/:profPath', (req, res) => {
+  const { profPath } = req.params;
+
+  if (PATHS_RESERVADOS.has(profPath.toLowerCase())) {
+    return res.status(404).sendFile(path.join(VIEWS_DIR, '404.html'));
+  }
+
+  const db = lerBanco();
+  const professor = db.professores.find(p => p.path === profPath.toLowerCase());
+
+  if (!professor) {
+    return res.status(404).sendFile(path.join(VIEWS_DIR, '404.html'));
+  }
+
+  res.sendFile(path.join(VIEWS_DIR, 'upload.html'));
+});
+
+// ============================================================
 // Inicia o servidor
 // ============================================================
 
 app.listen(PORT, '0.0.0.0', () => {
-  // Descobre o IP local para facilitar o acesso dos alunos
   const interfaces = os.networkInterfaces();
   let ipLocal = 'localhost';
 
@@ -245,10 +335,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(55));
   console.log('  Sistema de Recebimento de Atividades');
   console.log('='.repeat(55));
-  console.log(`  Servidor rodando em: http://localhost:${PORT}`);
   console.log(`  Acesso na rede local: http://${ipLocal}:${PORT}`);
   console.log('='.repeat(55));
-  console.log('  Compartilhe o endereço acima com os alunos.');
-  console.log('  Os arquivos serão salvos em: ' + UPLOAD_DIR);
+  console.log(`  Professores (criar sala):  /prof`);
+  console.log(`  Administracao (download):  /admin`);
+  console.log(`  Alunos:                    /<path-da-sala>`);
   console.log('='.repeat(55));
 });

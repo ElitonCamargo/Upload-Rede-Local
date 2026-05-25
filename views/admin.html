@@ -3,94 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Administrativo</title>
-  <style>
-    :root {
-      --bg: #f3f7ff;
-      --card: #ffffff;
-      --text: #13203a;
-      --accent: #1f6feb;
-      --accent-hover: #1256c4;
-      --border: #d9e2f2;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 16px;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: radial-gradient(circle at 20% 20%, #ffffff 0%, var(--bg) 45%, #e8efff 100%);
-      color: var(--text);
-    }
-
-    .card {
-      width: min(520px, 100%);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: var(--card);
-      box-shadow: 0 12px 35px rgba(15, 33, 73, 0.12);
-      padding: 28px;
-    }
-
-    h1 {
-      margin: 0 0 8px;
-      font-size: 1.6rem;
-    }
-
-    p {
-      margin: 0 0 18px;
-      color: #465069;
-      line-height: 1.5;
-    }
-
-    .action-box {
-      border: 1px dashed var(--border);
-      border-radius: 10px;
-      padding: 16px;
-      background: #f8fbff;
-    }
-
-    .btn {
-      width: 100%;
-      border: 0;
-      border-radius: 10px;
-      padding: 12px 14px;
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.98rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    .btn:hover {
-      background: var(--accent-hover);
-    }
-
-    .help {
-      margin-top: 10px;
-      font-size: 0.88rem;
-      color: #5d6780;
-    }
-  </style>
+  <title>Administração — Download de Atividades</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="card">
-    <h1>Administracao</h1>
-    <p>Clique no botao abaixo para baixar um arquivo ZIP com todas as pastas de envio e limpar o historico e os arquivos do sistema.</p>
+  <div class="container">
+    <section class="card">
+      <h1>⬇️ Download de Atividades</h1>
+      <p class="subtitulo">
+        Informe suas credenciais e o path da sua sala para baixar todas as atividades em um arquivo ZIP.
+        A sala será encerrada automaticamente após o download.
+      </p>
 
-    <section class="action-box">
-      <form method="GET" action="/api/admin/backup">
-        <button class="btn" type="submit">Baixar backup ZIP e limpar envios e uploads</button>
+      <form id="formAdmin">
+        <fieldset>
+          <legend>Suas credenciais</legend>
+          <div class="campo-nome">
+            <input type="text" id="usuario" placeholder="Seu usuário" autocomplete="username" required />
+          </div>
+          <div class="campo-nome">
+            <input type="password" id="senha" placeholder="Sua senha" autocomplete="current-password" required />
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Sala</legend>
+          <div class="campo-nome">
+            <input type="text" id="profPath" placeholder="Path da sala (ex: joao-turma-a)" autocomplete="off" required />
+          </div>
+        </fieldset>
+
+        <button type="submit" id="btnDownload">Baixar ZIP e encerrar sala</button>
       </form>
-      <p class="help">A limpeza do banco de envios e da pasta upload ocorre apos o envio do arquivo ZIP.</p>
+
+      <div id="mensagem" class="mensagem" hidden></div>
+
+      <p class="subtitulo" style="margin-top:20px; font-size:0.82rem;">
+        ⚠️ Esta ação é irreversível. Os arquivos e o registro da sala serão removidos do servidor após o download.
+      </p>
     </section>
-  </main>
+
+    <section class="card" style="text-align:center;">
+      <p class="subtitulo" style="margin:0;">
+        Ainda não tem uma sala?
+        <a href="/prof" style="color:#4a90d9; font-weight:600;">Criar nova sala</a>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const formAdmin   = document.getElementById('formAdmin');
+    const btnDownload = document.getElementById('btnDownload');
+    const mensagemEl  = document.getElementById('mensagem');
+
+    formAdmin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      esconderMensagem();
+
+      const usuario  = document.getElementById('usuario').value.trim();
+      const senha    = document.getElementById('senha').value;
+      const profPath = document.getElementById('profPath').value.trim().toLowerCase();
+
+      if (!usuario || !senha || !profPath) {
+        mostrarMensagem('Preencha todos os campos.', 'erro');
+        return;
+      }
+
+      btnDownload.disabled    = true;
+      btnDownload.textContent = 'Gerando ZIP…';
+
+      try {
+        const res = await fetch('/api/admin/backup', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ usuario, senha, path: profPath })
+        });
+
+        if (!res.ok) {
+          const dados = await res.json();
+          mostrarMensagem(dados.erro || 'Erro desconhecido.', 'erro');
+          return;
+        }
+
+        // Dispara o download via blob
+        const blob     = await res.blob();
+        const url      = URL.createObjectURL(blob);
+        const a        = document.createElement('a');
+        a.href         = url;
+        a.download     = `backup-${profPath}-${Date.now()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        mostrarMensagem('Download concluido! A sala foi encerrada.', 'sucesso');
+        formAdmin.reset();
+      } catch {
+        mostrarMensagem('Nao foi possivel conectar ao servidor.', 'erro');
+      } finally {
+        btnDownload.disabled    = false;
+        btnDownload.textContent = 'Baixar ZIP e encerrar sala';
+      }
+    });
+
+    function mostrarMensagem(texto, tipo) {
+      mensagemEl.textContent = texto;
+      mensagemEl.className   = 'mensagem ' + tipo;
+      mensagemEl.hidden      = false;
+    }
+
+    function esconderMensagem() { mensagemEl.hidden = true; }
+  </script>
 </body>
 </html>

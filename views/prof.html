@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar Sala de Atividades</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h1>🏫 Criar Sala de Atividades</h1>
+      <p class="subtitulo">Defina suas credenciais e o endereço que seus alunos vão acessar.</p>
+
+      <form id="formCriar">
+        <fieldset>
+          <legend>Suas credenciais</legend>
+
+          <div class="campo-nome">
+            <input type="text" id="usuario" placeholder="Seu usuário (ex: prof.joao)" autocomplete="username" required />
+          </div>
+          <div class="campo-nome">
+            <input type="password" id="senha" placeholder="Sua senha" autocomplete="new-password" required />
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Endereço da sala</legend>
+          <p class="subtitulo" style="margin-bottom:10px">
+            Escolha um identificador único para sua sala. Somente letras, números e hifens.
+          </p>
+          <div class="campo-nome">
+            <input
+              type="text"
+              id="profPath"
+              placeholder="ex: joao-turma-a"
+              pattern="[a-zA-Z0-9][a-zA-Z0-9\-]{0,48}"
+              autocomplete="off"
+              required
+            />
+          </div>
+          <div id="previewUrl" class="subtitulo" style="margin-top:6px; font-size:0.85rem; color:#4a90d9;"></div>
+        </fieldset>
+
+        <button type="submit" id="btnCriar">Criar Sala</button>
+      </form>
+
+      <div id="mensagem" class="mensagem" hidden></div>
+    </section>
+
+    <section class="card" id="cardSucesso" hidden>
+      <h2>✅ Sala criada!</h2>
+      <p class="subtitulo">Compartilhe o link abaixo com seus alunos:</p>
+      <div id="linkSala" style="
+        background:#eaf2fc;
+        border:1px solid #bdd7f5;
+        border-radius:8px;
+        padding:14px 16px;
+        font-size:1.05rem;
+        font-weight:600;
+        color:#1a5fa8;
+        word-break:break-all;
+        margin-bottom:12px;
+      "></div>
+      <p class="subtitulo">
+        Para baixar as atividades recebidas, acesse
+        <a href="/admin" style="color:#4a90d9;">/admin</a>
+        usando as mesmas credenciais e o mesmo path.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const inputPath  = document.getElementById('profPath');
+    const previewUrl = document.getElementById('previewUrl');
+    const form       = document.getElementById('formCriar');
+    const btnCriar   = document.getElementById('btnCriar');
+    const mensagemEl = document.getElementById('mensagem');
+    const cardSucesso = document.getElementById('cardSucesso');
+    const linkSalaEl  = document.getElementById('linkSala');
+
+    // Força lowercase ao digitar no campo path
+    inputPath.addEventListener('input', () => {
+      const val = inputPath.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      inputPath.value = val;
+      previewUrl.textContent = val ? `${window.location.origin}/${val}` : '';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      esconderMensagem();
+      btnCriar.disabled = true;
+      btnCriar.textContent = 'Criando…';
+
+      try {
+        const res = await fetch('/api/prof/criar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usuario: document.getElementById('usuario').value.trim(),
+            senha:   document.getElementById('senha').value,
+            path:    inputPath.value
+          })
+        });
+
+        const dados = await res.json();
+
+        if (res.ok) {
+          form.hidden = true;
+          mensagemEl.hidden = true;
+          cardSucesso.hidden = false;
+          linkSalaEl.textContent = `${window.location.origin}/${dados.path}`;
+        } else {
+          mostrarMensagem(dados.erro || 'Erro ao criar sala.', 'erro');
+        }
+      } catch {
+        mostrarMensagem('Nao foi possivel conectar ao servidor.', 'erro');
+      } finally {
+        btnCriar.disabled = false;
+        btnCriar.textContent = 'Criar Sala';
+      }
+    });
+
+    function mostrarMensagem(texto, tipo) {
+      mensagemEl.textContent = texto;
+      mensagemEl.className   = 'mensagem ' + tipo;
+      mensagemEl.hidden      = false;
+    }
+
+    function esconderMensagem() {
+      mensagemEl.hidden = true;
+    }
+  </script>
+</body>
+</html>

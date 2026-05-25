@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envio de Atividade</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h1>📄 Envio de Atividade</h1>
+      <p class="subtitulo" id="labelSala">Preencha os campos abaixo e envie seus arquivos.</p>
+
+      <form id="formEnvio">
+        <fieldset>
+          <legend>Aluno(s)</legend>
+          <div id="camposNomes">
+            <div class="campo-nome">
+              <input type="text" name="nome" placeholder="Nome completo do aluno" required />
+            </div>
+          </div>
+          <button type="button" id="btnAdicionarNome">+ Adicionar aluno ao grupo</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Arquivos</legend>
+          <div id="dropzone">
+            <p>Arraste os arquivos aqui<br/>ou <strong>clique para selecionar</strong></p>
+            <input type="file" id="inputArquivos" multiple />
+          </div>
+          <ul id="listaArquivos"></ul>
+        </fieldset>
+
+        <button type="submit" id="btnEnviar">Enviar Atividade</button>
+      </form>
+
+      <div id="mensagem" class="mensagem" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>✅ Atividades Enviadas</h2>
+      <p class="subtitulo">Lista atualizada automaticamente após cada envio.</p>
+      <ul id="listaEnvios" class="lista-envios">
+        <li class="vazio">Nenhuma atividade enviada ainda.</li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    // Extrai o path da sala a partir da URL (ex: /eliton → "eliton")
+    const profPath = window.location.pathname.replace(/^\//, '').split('/')[0];
+
+    const formEnvio      = document.getElementById('formEnvio');
+    const camposNomes    = document.getElementById('camposNomes');
+    const btnAdicionarNome = document.getElementById('btnAdicionarNome');
+    const dropzone       = document.getElementById('dropzone');
+    const inputArquivos  = document.getElementById('inputArquivos');
+    const listaArquivosEl = document.getElementById('listaArquivos');
+    const listaEnviosEl  = document.getElementById('listaEnvios');
+    const mensagemEl     = document.getElementById('mensagem');
+    const btnEnviar      = document.getElementById('btnEnviar');
+
+    document.getElementById('labelSala').textContent =
+      `Sala: /${profPath} — Preencha os campos abaixo e envie seus arquivos.`;
+
+    let arquivosSelecionados = [];
+
+    // ── Campos de nome dinâmicos ──────────────────────────────
+
+    btnAdicionarNome.addEventListener('click', () => {
+      const div = document.createElement('div');
+      div.classList.add('campo-nome');
+      div.innerHTML = `
+        <input type="text" name="nome" placeholder="Nome completo do aluno" required />
+        <button type="button" class="btn-remover" title="Remover">&times;</button>
+      `;
+      camposNomes.appendChild(div);
+      div.querySelector('.btn-remover').addEventListener('click', () => div.remove());
+    });
+
+    // ── Drag & Drop + seleção ─────────────────────────────────
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+      dropzone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+    });
+
+    dropzone.addEventListener('dragenter', () => dropzone.classList.add('drag-over'));
+    dropzone.addEventListener('dragover',  () => dropzone.classList.add('drag-over'));
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', (e) => {
+      dropzone.classList.remove('drag-over');
+      adicionarArquivos(Array.from(e.dataTransfer.files));
+    });
+
+    inputArquivos.addEventListener('change', () => {
+      adicionarArquivos(Array.from(inputArquivos.files));
+      inputArquivos.value = '';
+    });
+
+    function adicionarArquivos(novos) {
+      for (const arq of novos) {
+        const duplicado = arquivosSelecionados.some(a => a.name === arq.name && a.size === arq.size);
+        if (!duplicado) arquivosSelecionados.push(arq);
+      }
+      renderizarListaArquivos();
+    }
+
+    function renderizarListaArquivos() {
+      listaArquivosEl.innerHTML = '';
+      arquivosSelecionados.forEach((arq, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>📎 ${arq.name} <small>(${formatarTamanho(arq.size)})</small></span>
+          <button type="button" data-index="${idx}" title="Remover">&times;</button>
+        `;
+        listaArquivosEl.appendChild(li);
+      });
+      listaArquivosEl.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          arquivosSelecionados.splice(parseInt(btn.dataset.index, 10), 1);
+          renderizarListaArquivos();
+        });
+      });
+    }
+
+    function formatarTamanho(bytes) {
+      if (bytes < 1024)            return bytes + ' B';
+      if (bytes < 1024 * 1024)     return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // ── Envio do formulário ───────────────────────────────────
+
+    formEnvio.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      esconderMensagem();
+
+      const nomes = Array.from(camposNomes.querySelectorAll('input[name="nome"]'))
+                         .map(i => i.value.trim());
+
+      if (nomes.some(n => n === '')) {
+        mostrarMensagem('Preencha todos os campos de nome.', 'erro');
+        return;
+      }
+      if (arquivosSelecionados.length === 0) {
+        mostrarMensagem('Selecione pelo menos um arquivo para enviar.', 'erro');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('nomes', JSON.stringify(nomes));
+      arquivosSelecionados.forEach(arq => formData.append('arquivos', arq));
+
+      btnEnviar.disabled    = true;
+      btnEnviar.textContent = 'Enviando…';
+
+      try {
+        const resp  = await fetch(`/api/enviar/${profPath}`, { method: 'POST', body: formData });
+        const dados = await resp.json();
+
+        if (resp.ok) {
+          mostrarMensagem(dados.mensagem, 'sucesso');
+          limparFormulario();
+          carregarEnvios();
+        } else {
+          mostrarMensagem(dados.erro || 'Erro ao enviar.', 'erro');
+        }
+      } catch {
+        mostrarMensagem('Nao foi possivel conectar ao servidor.', 'erro');
+      } finally {
+        btnEnviar.disabled    = false;
+        btnEnviar.textContent = 'Enviar Atividade';
+      }
+    });
+
+    function limparFormulario() {
+      camposNomes.innerHTML = `
+        <div class="campo-nome">
+          <input type="text" name="nome" placeholder="Nome completo do aluno" required />
+        </div>
+      `;
+      arquivosSelecionados = [];
+      renderizarListaArquivos();
+    }
+
+    // ── Mensagens ─────────────────────────────────────────────
+
+    function mostrarMensagem(texto, tipo) {
+      mensagemEl.textContent = texto;
+      mensagemEl.className   = 'mensagem ' + tipo;
+      mensagemEl.hidden      = false;
+    }
+
+    function esconderMensagem() { mensagemEl.hidden = true; }
+
+    // ── Lista de envios ───────────────────────────────────────
+
+    async function carregarEnvios() {
+      try {
+        const resp   = await fetch(`/api/envios/${profPath}`);
+        const envios = await resp.json();
+
+        if (envios.length === 0) {
+          listaEnviosEl.innerHTML = '<li class="vazio">Nenhuma atividade enviada ainda.</li>';
+          return;
+        }
+
+        envios.sort((a, b) => b.id - a.id);
+        listaEnviosEl.innerHTML = envios.map(envio => `
+          <li>
+            <div>
+              <div class="nome-envio">${esc(envio.nomes.join(' — '))}</div>
+              <div class="arquivos-envio">${envio.arquivos.length} arquivo(s): ${envio.arquivos.map(esc).join(', ')}</div>
+            </div>
+            <span class="data-envio">${esc(envio.dataEnvio)}</span>
+          </li>
+        `).join('');
+      } catch (err) {
+        console.error('Erro ao carregar envios:', err);
+      }
+    }
+
+    function esc(texto) {
+      const d = document.createElement('div');
+      d.textContent = texto;
+      return d.innerHTML;
+    }
+
+    carregarEnvios();
+  </script>
+</body>
+</html>

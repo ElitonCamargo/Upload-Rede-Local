@@ -1,3 +1,26 @@
 {
-  "envios": []
+  "professores": [
+    {
+      "id": 1779712344463,
+      "usuario": "eliton",
+      "senhaHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+      "path": "bd",
+      "criadoEm": "25/05/2026, 09:32:24"
+    }
+  ],
+  "envios": [
+    {
+      "id": 1779712362306,
+      "professorPath": "bd",
+      "nomes": [
+        "Eliton"
+      ],
+      "ip": "127.0.0.1",
+      "pasta": "Eliton",
+      "arquivos": [
+        "Avaliação BD2.docx"
+      ],
+      "dataEnvio": "25/05/2026, 09:32:42"
+    }
+  ]
 }
