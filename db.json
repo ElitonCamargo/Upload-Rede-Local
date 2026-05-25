@@ -1,26 +1,19 @@
 {
   "professores": [
     {
-      "id": 1779712344463,
+      "id": 1779723457371,
       "usuario": "eliton",
-      "senhaHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
-      "path": "bd",
-      "criadoEm": "25/05/2026, 09:32:24"
+      "senhaHash": "c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646",
+      "criadoEm": "25/05/2026, 12:37:37"
     }
   ],
-  "envios": [
+  "envios": [],
+  "atividades": [
     {
-      "id": 1779712362306,
-      "professorPath": "bd",
-      "nomes": [
-        "Eliton"
-      ],
-      "ip": "127.0.0.1",
-      "pasta": "Eliton",
-      "arquivos": [
-        "Avaliação BD2.docx"
-      ],
-      "dataEnvio": "25/05/2026, 09:32:42"
+      "id": 1779727080366,
+      "professorId": 1779723457371,
+      "path": "bd",
+      "criadaEm": "25/05/2026, 13:38:00"
     }
   ]
 }

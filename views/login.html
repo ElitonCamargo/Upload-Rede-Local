@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Professor</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .btn-primario {
+      width: 100%;
+      padding: 12px;
+      background: #4a90d9;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primario:hover   { background: #3a7bc8; }
+    .btn-primario:disabled { background: #a0c4e8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h1>🔑 Login</h1>
+      <p class="subtitulo">Acesse o painel para gerenciar suas atividades.</p>
+
+      <form id="formLogin">
+        <fieldset>
+          <legend>Suas credenciais</legend>
+          <div class="campo-nome">
+            <input type="text" id="usuario" placeholder="Usuário" autocomplete="username" required />
+          </div>
+          <div class="campo-nome">
+            <input type="password" id="senha" placeholder="Senha" autocomplete="current-password" required />
+          </div>
+        </fieldset>
+
+        <button type="submit" id="btnLogin" class="btn-primario">Entrar</button>
+      </form>
+
+      <div id="mensagem" class="mensagem" hidden></div>
+    </section>
+
+    <section class="card" style="text-align:center;">
+      <p class="subtitulo" style="margin:0;">
+        Ainda nao tem uma conta?
+        <a href="/cadastro" style="color:#4a90d9; font-weight:600;">Criar conta</a>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const formLogin  = document.getElementById('formLogin');
+    const btnLogin   = document.getElementById('btnLogin');
+    const mensagemEl = document.getElementById('mensagem');
+
+    formLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      esconderMensagem();
+
+      const usuario = document.getElementById('usuario').value.trim();
+      const senha   = document.getElementById('senha').value;
+
+      btnLogin.disabled    = true;
+      btnLogin.textContent = 'Entrando…';
+
+      try {
+        const res  = await fetch('/api/login', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ usuario, senha })
+        });
+        const dados = await res.json();
+
+        if (res.ok) {
+          window.location.href = '/admin';
+        } else {
+          mostrarMensagem(dados.erro || 'Erro ao fazer login.', 'erro');
+        }
+      } catch {
+        mostrarMensagem('Nao foi possivel conectar ao servidor.', 'erro');
+      } finally {
+        btnLogin.disabled    = false;
+        btnLogin.textContent = 'Entrar';
+      }
+    });
+
+    function mostrarMensagem(texto, tipo) {
+      mensagemEl.textContent = texto;
+      mensagemEl.className   = 'mensagem ' + tipo;
+      mensagemEl.hidden      = false;
+    }
+
+    function esconderMensagem() { mensagemEl.hidden = true; }
+  </script>
+</body>
+</html>

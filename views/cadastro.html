@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro de Professor</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .btn-primario {
+      width: 100%;
+      padding: 12px;
+      background: #4a90d9;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primario:hover  { background: #3a7bc8; }
+    .btn-primario:disabled { background: #a0c4e8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="card">
+      <h1>🎓 Cadastro de Professor</h1>
+      <p class="subtitulo">Crie sua conta para gerenciar atividades dos alunos.</p>
+
+      <form id="formCadastro">
+        <fieldset>
+          <legend>Suas credenciais</legend>
+          <div class="campo-nome">
+            <input
+              type="text"
+              id="usuario"
+              placeholder="Usuário (ex: prof.joao)"
+              pattern="[a-zA-Z0-9._\-]{3,30}"
+              autocomplete="username"
+              required
+            />
+          </div>
+          <div class="campo-nome">
+            <input type="password" id="senha" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password" required />
+          </div>
+          <div class="campo-nome">
+            <input type="password" id="confirmarSenha" placeholder="Confirmar senha" autocomplete="new-password" required />
+          </div>
+        </fieldset>
+
+        <button type="submit" id="btnCadastrar" class="btn-primario">Criar Conta</button>
+      </form>
+
+      <div id="mensagem" class="mensagem" hidden></div>
+    </section>
+
+    <section class="card" style="text-align:center;">
+      <p class="subtitulo" style="margin:0;">
+        Já tem uma conta?
+        <a href="/login" style="color:#4a90d9; font-weight:600;">Fazer login</a>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const formCadastro  = document.getElementById('formCadastro');
+    const btnCadastrar  = document.getElementById('btnCadastrar');
+    const mensagemEl    = document.getElementById('mensagem');
+
+    formCadastro.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      esconderMensagem();
+
+      const usuario        = document.getElementById('usuario').value.trim();
+      const senha          = document.getElementById('senha').value;
+      const confirmarSenha = document.getElementById('confirmarSenha').value;
+
+      if (senha !== confirmarSenha) {
+        mostrarMensagem('As senhas nao coincidem.', 'erro');
+        return;
+      }
+
+      btnCadastrar.disabled    = true;
+      btnCadastrar.textContent = 'Cadastrando…';
+
+      try {
+        const res  = await fetch('/api/cadastro', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ usuario, senha })
+        });
+        const dados = await res.json();
+
+        if (res.ok) {
+          mostrarMensagem(dados.mensagem, 'sucesso');
+          formCadastro.reset();
+          setTimeout(() => { window.location.href = '/login'; }, 1500);
+        } else {
+          mostrarMensagem(dados.erro || 'Erro ao criar conta.', 'erro');
+        }
+      } catch {
+        mostrarMensagem('Nao foi possivel conectar ao servidor.', 'erro');
+      } finally {
+        btnCadastrar.disabled    = false;
+        btnCadastrar.textContent = 'Criar Conta';
+      }
+    });
+
+    function mostrarMensagem(texto, tipo) {
+      mensagemEl.textContent = texto;
+      mensagemEl.className   = 'mensagem ' + tipo;
+      mensagemEl.hidden      = false;
+    }
+
+    function esconderMensagem() { mensagemEl.hidden = true; }
+  </script>
+</body>
+</html>
