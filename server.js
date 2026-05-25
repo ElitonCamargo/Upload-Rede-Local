@@ -163,6 +163,12 @@ const upload = multer({ storage });
 // ============================================================
 
 app.use(express.json());
+
+app.get('/', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.redirect('/login');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware de autenticacao
@@ -180,11 +186,6 @@ function requireAuth(req, res, next) {
 // ============================================================
 // Rotas HTML
 // ============================================================
-
-app.get('/', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.redirect('/login');
-});
 
 app.get('/cadastro', (_req, res) => res.sendFile(path.join(VIEWS_DIR, 'cadastro.html')));
 
@@ -358,6 +359,68 @@ app.post('/api/admin/atividades/:atividadePath/finalizar', requireAuth, (req, re
   } catch (err) {
     console.error('Erro ao finalizar atividade:', err);
     res.status(500).json({ erro: 'Erro interno ao finalizar atividade.' });
+  }
+});
+
+// GET /api/admin/atividades/:atividadePath/envios
+app.get('/api/admin/atividades/:atividadePath/envios', requireAuth, (req, res) => {
+  const { atividadePath } = req.params;
+  const db = lerBanco();
+  const atividade = db.atividades.find(
+    a => a.path === atividadePath.toLowerCase() && a.professorId === req.professor.professorId
+  );
+  if (!atividade) {
+    return res.status(404).json({ erro: 'Atividade nao encontrada ou sem permissao.' });
+  }
+  const envios = db.envios.filter(e => e.atividadePath === atividadePath.toLowerCase());
+  res.json(envios);
+});
+
+// GET /api/admin/envios/:envioId/download
+app.get('/api/admin/envios/:envioId/download', requireAuth, (req, res) => {
+  try {
+    const envioId = Number(req.params.envioId);
+    const db = lerBanco();
+    const envio = db.envios.find(e => e.id === envioId);
+    if (!envio) return res.status(404).json({ erro: 'Envio nao encontrado.' });
+
+    const atividade = db.atividades.find(a => a.path === envio.atividadePath);
+    if (!atividade) return res.status(404).json({ erro: 'Atividade nao encontrada.' });
+
+    if (atividade.professorId !== req.professor.professorId) {
+      return res.status(403).json({ erro: 'Sem permissao para acessar este envio.' });
+    }
+
+    const professor = db.professores.find(p => p.id === req.professor.professorId);
+    if (!professor) return res.status(401).json({ erro: 'Professor nao encontrado.' });
+
+    const dirEnvio = path.join(
+      UPLOAD_DIR,
+      sanitizarNomePasta(professor.usuario),
+      sanitizarNomePasta(atividade.path),
+      sanitizarNomePasta(envio.pasta)
+    );
+
+    if (!fs.existsSync(dirEnvio)) {
+      return res.status(404).json({ erro: 'Arquivos deste envio nao encontrados no servidor.' });
+    }
+
+    const nomeArquivo = `${sanitizarNomePasta(envio.nomes.join('-'))}-${atividade.path}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      console.error('Erro ao gerar ZIP do envio:', err);
+      if (!res.headersSent) res.status(500).json({ erro: 'Erro ao gerar arquivo ZIP.' });
+      else res.end();
+    });
+    archive.pipe(res);
+    archive.directory(dirEnvio, false);
+    archive.finalize();
+  } catch (err) {
+    console.error('Erro ao baixar envio:', err);
+    res.status(500).json({ erro: 'Erro interno ao processar download.' });
   }
 });
 

@@ -54,6 +54,21 @@
     }
     .btn-sair:hover { background: #e74c3c; color: #fff; }
 
+    .btn-visualizar {
+      padding: 6px 14px;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+      margin-right: 6px;
+    }
+    .btn-visualizar:hover { background: #3a7bc8; }
+
     .btn-finalizar {
       padding: 6px 14px;
       background: #e74c3c;
@@ -137,6 +152,66 @@
       color: #999;
       margin-top: 8px;
     }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.aberto { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.2rem; }
+
+    .btn-fechar {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: #888;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .btn-fechar:hover { color: #333; }
+
+    .btn-download {
+      padding: 5px 12px;
+      background: #27ae60;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .btn-download:hover    { background: #1e8449; }
+    .btn-download:disabled { background: #82c9a0; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -205,6 +280,39 @@
 
   </div>
 
+  <!-- Modal de envios -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitulo">Envios</h2>
+        <button class="btn-fechar" id="btnFecharModal" title="Fechar">&times;</button>
+      </div>
+      <p class="subtitulo" id="modalSubtitulo" style="margin-bottom:16px;"></p>
+
+      <p id="modalVazio" class="subtitulo" hidden style="text-align:center; padding:20px 0;">
+        Nenhum envio registrado para esta atividade.
+      </p>
+
+      <div style="overflow-x:auto;" id="modalTabelaWrap" hidden>
+        <table>
+          <thead>
+            <tr>
+              <th>Aluno(s)</th>
+              <th>Arquivos</th>
+              <th>Enviado em</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody id="modalCorpo"></tbody>
+        </table>
+      </div>
+
+      <p class="subtitulo" style="margin-top:10px; font-size:0.78rem;">
+        ℹ️ O download baixa apenas os arquivos deste envio. Nada é removido do sistema.
+      </p>
+    </div>
+  </div>
+
   <script>
     const nomeProf      = document.getElementById('nomeProf');
     const btnSair       = document.getElementById('btnSair');
@@ -215,8 +323,19 @@
     const mensagemCriar = document.getElementById('mensagemCriar');
     const semAtividades = document.getElementById('semAtividades');
     const tabelaWrap    = document.getElementById('tabelaWrap');
-    const corpoTabela   = document.getElementById('corpoTabela');
-    const mensagemAcao  = document.getElementById('mensagemAcao');
+    const corpoTabela    = document.getElementById('corpoTabela');
+    const mensagemAcao   = document.getElementById('mensagemAcao');
+    const modalOverlay   = document.getElementById('modalOverlay');
+    const modalTitulo    = document.getElementById('modalTitulo');
+    const modalSubtitulo = document.getElementById('modalSubtitulo');
+    const modalVazio     = document.getElementById('modalVazio');
+    const modalTabelaWrap = document.getElementById('modalTabelaWrap');
+    const modalCorpo     = document.getElementById('modalCorpo');
+    const btnFecharModal = document.getElementById('btnFecharModal');
+
+    btnFecharModal.addEventListener('click', fecharModal);
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) fecharModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharModal(); });
 
     // ── Inicializa pagina ─────────────────────────────────────
 
@@ -311,6 +430,11 @@
             <td><span class="badge-envios">${a.totalEnvios}</span></td>
             <td>
               <button
+                class="btn-visualizar"
+                data-path="${esc(a.path)}"
+                onclick="VisualizarAtividade(this)"
+              >Visualizar</button>
+              <button
                 class="btn-finalizar"
                 data-path="${esc(a.path)}"
                 onclick="finalizarAtividade(this)"
@@ -321,6 +445,92 @@
       } catch (err) {
         console.error('Erro ao carregar atividades:', err);
       }
+    }
+
+    // ── Visualizar envios ─────────────────────────────────────
+
+    async function VisualizarAtividade(btn) {
+      const atividadePath = btn.dataset.path;
+      modalTitulo.textContent    = `Envios — /${atividadePath}`;
+      modalSubtitulo.textContent = 'Carregando...';
+      modalVazio.hidden          = true;
+      modalTabelaWrap.hidden     = true;
+      modalOverlay.classList.add('aberto');
+
+      try {
+        const res    = await fetch(`/api/admin/atividades/${encodeURIComponent(atividadePath)}/envios`);
+        const envios = await res.json();
+
+        if (!res.ok) {
+          modalSubtitulo.textContent = envios.erro || 'Erro ao carregar envios.';
+          return;
+        }
+
+        modalSubtitulo.textContent = `${envios.length} envio(s) registrado(s).`;
+
+        if (envios.length === 0) {
+          modalVazio.hidden      = false;
+          modalTabelaWrap.hidden = true;
+          return;
+        }
+
+        envios.sort((a, b) => b.id - a.id);
+        modalCorpo.innerHTML = envios.map(e => `
+          <tr>
+            <td>${esc(e.nomes.join(', '))}</td>
+            <td style="font-size:0.82rem; color:#666;">${e.arquivos.map(esc).join('<br>')}</td>
+            <td style="font-size:0.82rem; color:#999; white-space:nowrap;">${esc(e.dataEnvio)}</td>
+            <td>
+              <button
+                class="btn-download"
+                data-id="${e.id}"
+                data-nomes="${esc(e.nomes.join('-'))}"
+                onclick="baixarEnvio(this)"
+              >⬇ Baixar</button>
+            </td>
+          </tr>
+        `).join('');
+
+        modalTabelaWrap.hidden = false;
+      } catch {
+        modalSubtitulo.textContent = 'Nao foi possivel carregar os envios.';
+      }
+    }
+
+    async function baixarEnvio(btn) {
+      const envioId = btn.dataset.id;
+      btn.disabled    = true;
+      btn.textContent = '…';
+
+      try {
+        const res = await fetch(`/api/admin/envios/${encodeURIComponent(envioId)}/download`);
+
+        if (!res.ok) {
+          const dados = await res.json();
+          alert(dados.erro || 'Erro ao baixar envio.');
+          return;
+        }
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `envio-${envioId}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        alert('Nao foi possivel conectar ao servidor.');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '⬇ Baixar';
+      }
+    }
+
+    function fecharModal() {
+      modalOverlay.classList.remove('aberto');
+      modalCorpo.innerHTML = '';
     }
 
     // ── Finalizar atividade ───────────────────────────────────

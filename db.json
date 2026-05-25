@@ -1,19 +1,5 @@
 {
-  "professores": [
-    {
-      "id": 1779723457371,
-      "usuario": "eliton",
-      "senhaHash": "c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646",
-      "criadoEm": "25/05/2026, 12:37:37"
-    }
-  ],
+  "professores": [],
   "envios": [],
-  "atividades": [
-    {
-      "id": 1779727080366,
-      "professorId": 1779723457371,
-      "path": "bd",
-      "criadaEm": "25/05/2026, 13:38:00"
-    }
-  ]
+  "atividades": []
 }
