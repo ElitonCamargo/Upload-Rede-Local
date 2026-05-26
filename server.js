@@ -166,7 +166,7 @@ app.use(express.json());
 
 app.get('/', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.redirect('/login');
+  res.sendFile(path.join(VIEWS_DIR, 'index.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
